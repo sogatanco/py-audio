@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Memproses...</title>
+    <style>
+        #progress-bar {
+            width: 100%;
+            background-color: #eee;
+        }
+        #progress-bar-fill {
+            width: 0%;
+            height: 30px;
+            background-color: #4caf50;
+            text-align: center;
+            color: white;
+            line-height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Transkripsi sedang diproses...</h2>
+    <div id="progress-bar">
+        <div id="progress-bar-fill">0%</div>
+    </div>
+    <p id="status-text">Mohon tunggu, proses sedang berjalan.</p>
+    <script>
+        function checkProgress() {
+            fetch("/progress/{{ task_id }}")
+                .then(response => response.json())
+                .then(data => {
+                    let fill = document.getElementById('progress-bar-fill');
+                    fill.style.width = data.progress + '%';
+                    fill.textContent = data.progress + '%';
+                    if (data.status === 'done') {
+                        window.location.href = "/result/{{ task_id }}";
+                    } else if (data.status === 'error') {
+                        document.getElementById('status-text').textContent = "Terjadi error: " + data.error;
+                    } else {
+                        setTimeout(checkProgress, 1000);
+                    }
+                });
+        }
+        checkProgress();
+    </script>
+</body>
+</html>
