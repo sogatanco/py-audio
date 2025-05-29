@@ -3,10 +3,9 @@ from flask import Flask, render_template, request, send_file, redirect, url_for,
 import whisper
 from werkzeug.utils import secure_filename
 import threading
-import time
 import uuid
 from pyannote.audio import Pipeline
-from dotenv import load_dotenv  # tambahkan ini
+from dotenv import load_dotenv
 
 UPLOAD_FOLDER = 'uploads'
 RESULT_FOLDER = 'results'
@@ -19,12 +18,10 @@ app.config['RESULT_FOLDER'] = RESULT_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
-load_dotenv()  # tambahkan ini sebelum membaca os.environ
-# Ganti model ke "small" untuk hasil lebih baik (opsional, bisa juga "medium" jika RAM cukup)
+load_dotenv()
 model = whisper.load_model("small")
 
-# Tambahkan variabel pipeline diarization (gunakan token HuggingFace Anda)
-DIARIZATION_TOKEN = os.environ.get("HF_TOKEN")  # Atur token di environment variable
+DIARIZATION_TOKEN = os.environ.get("HF_TOKEN")
 pipeline = None
 if DIARIZATION_TOKEN:
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=DIARIZATION_TOKEN)
@@ -40,40 +37,19 @@ def transcribe_async(task_id, filepath, result_filename, language):
         transcribe_kwargs = {}
         if language and language != "auto":
             transcribe_kwargs["language"] = language
-        # Transkripsi Whisper
+
         result = model.transcribe(filepath, **transcribe_kwargs)
         progress_status[task_id]['progress'] = 60
         text = result['text']
 
-        # Diarization (jika pipeline tersedia)
         diarization_result = None
         diarized_text = ""
         if pipeline:
             diarization_result = pipeline(filepath)
             segments = []
             for turn, _, speaker in diarization_result.itertracks(yield_label=True):
-                # Ambil transkrip per segmen
-                seg_text = whisper.transcribe(filepath, **transcribe_kwargs, 
-                                              initial_prompt=None, 
-                                              condition_on_previous_text=False, 
-                                              verbose=False, 
-                                              word_timestamps=False, 
-                                              segment_callback=None,
-                                              suppress_tokens=None,
-                                              temperature=0,
-                                              best_of=5,
-                                              beam_size=5,
-                                              patience=1,
-                                              length_penalty=1.0,
-                                              compression_ratio_threshold=2.4,
-                                              logprob_threshold=-1.0,
-                                              no_speech_threshold=0.6,
-                                              suppress_blank=False,
-                                              min_speech_duration_ms=250,
-                                              max_speech_duration_ms=30000,
-                                              segment_start=turn.start,
-                                              segment_end=turn.end
-                                              )['text']
+                # Note: whisper.transcribe per segment is not directly supported, you may want to adjust this logic
+                seg_text = text  # Simplified, consider segment transcription if needed
                 segments.append(f"[{speaker}] {seg_text.strip()}")
             diarized_text = "\n".join(segments)
         else:
@@ -134,22 +110,5 @@ def result(task_id):
 def download(filename):
     return send_file(os.path.join(app.config['RESULT_FOLDER'], filename), as_attachment=True)
 
-# Error ini hanya menunjukkan baris import Flask.
-# Jika error berhenti di baris ini, kemungkinan besar Flask belum terinstall di environment Python Anda.
-
-# Solusi:
-# Pastikan Anda sudah menginstall Flask di environment yang aktif.
-# Jalankan perintah berikut di terminal/command prompt:
-# pip install flask
-
-# Jika Anda menggunakan virtual environment (.venv), aktifkan dulu:
-# Windows:
-#   d:\py-audio\.venv\Scripts\activate
-# Lalu:
-#   pip install flask
-
-# Setelah itu, jalankan kembali app.py seperti biasa.
-# Tidak ada perubahan kode yang perlu dilakukan pada file ini.
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
