@@ -19,11 +19,17 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 load_dotenv()
-model = whisper.load_model("small", device="cpu")  # pastikan pakai CPU
+
+# Paksa Whisper pakai CPU dan matikan fp16
+model = whisper.load_model("small", device="cpu")
 
 DIARIZATION_TOKEN = os.environ.get("HF_TOKEN")
 pipeline = None
 if DIARIZATION_TOKEN:
+    # Pyannote pipeline biasanya otomatis pakai GPU kalau ada,
+    # untuk paksa CPU, kita bisa set environment variable:
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # MacOS fallback, optional
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""          # Disable CUDA supaya pakai CPU
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=DIARIZATION_TOKEN)
 
 progress_status = {}
@@ -34,31 +40,30 @@ def allowed_file(filename):
 def transcribe_async(task_id, filepath, result_filename, language):
     progress_status[task_id] = {'status': 'processing', 'progress': 10}
     try:
-        transcribe_kwargs = {"device": "cpu"}  # pastikan transkripsi di CPU
+        transcribe_kwargs = {"fp16": False}  # Matikan fp16
         if language and language != "auto":
             transcribe_kwargs["language"] = language
 
+        # Transkripsi menggunakan Whisper pakai CPU dan tanpa fp16
         result = model.transcribe(filepath, **transcribe_kwargs)
         progress_status[task_id]['progress'] = 60
         text = result['text']
 
-        diarization_result = None
-        diarized_text = ""
+        diarized_text = text
         if pipeline:
             diarization_result = pipeline(filepath)
             segments = []
             for turn, _, speaker in diarization_result.itertracks(yield_label=True):
-                # Note: whisper.transcribe per segment is not directly supported, you may want to adjust this logic
-                seg_text = text  # Simplified, consider segment transcription if needed
-                segments.append(f"[{speaker}] {seg_text.strip()}")
+                # Note: Whisper tidak support transcribe per segmen secara default,
+                # jadi disini hanya tandai speaker dengan seluruh teks (simplifikasi).
+                segments.append(f"[{speaker}] {text.strip()}")
             diarized_text = "\n".join(segments)
-        else:
-            diarized_text = text
 
         progress_status[task_id]['progress'] = 90
         result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
         with open(result_path, 'w', encoding='utf-8') as f:
             f.write(diarized_text)
+
         progress_status[task_id] = {
             'status': 'done',
             'progress': 100,
