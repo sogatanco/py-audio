@@ -19,7 +19,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 load_dotenv()
-model = whisper.load_model("small")
+model = whisper.load_model("small", device="cpu")  # pastikan pakai CPU
 
 DIARIZATION_TOKEN = os.environ.get("HF_TOKEN")
 pipeline = None
@@ -34,7 +34,7 @@ def allowed_file(filename):
 def transcribe_async(task_id, filepath, result_filename, language):
     progress_status[task_id] = {'status': 'processing', 'progress': 10}
     try:
-        transcribe_kwargs = {}
+        transcribe_kwargs = {"device": "cpu"}  # pastikan transkripsi di CPU
         if language and language != "auto":
             transcribe_kwargs["language"] = language
 
