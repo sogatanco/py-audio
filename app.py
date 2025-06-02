@@ -21,7 +21,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 load_dotenv()
 
 # Paksa Whisper pakai CPU dan matikan fp16
-model = whisper.load_model("small", device="cpu")
+model = whisper.load_model("medium", device="cpu")
 
 DIARIZATION_TOKEN = os.environ.get("HF_TOKEN")
 pipeline = None
